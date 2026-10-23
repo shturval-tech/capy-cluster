@@ -1,0 +1,59 @@
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+kind: YandexCluster
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Name }}
+  labels:
+    cluster.x-k8s.io/cluster-name: {{ .Release.Name | quote }}
+    {{- include "capy-cluster.labels" . | nindent 4 }}
+spec:
+  folderID: {{ required "capy.folderID is required" .Values.capy.folderID | quote }}
+  network:
+    id: {{ required "capy.networkID is required" .Values.capy.networkID | quote }}
+  loadBalancer:
+    type: {{ .Values.capy.loadBalancer.type | default "ALB" | quote }}
+    {{- if .Values.capy.loadBalancer.name }}
+    name: {{ .Values.capy.loadBalancer.name | quote }}
+    {{- else }}
+    name: {{ printf "%s-lb" .Release.Name | quote }}
+    {{- end }}
+    backendPort: {{ .Values.capy.loadBalancer.backendPort | default 6443 }}
+    {{- with .Values.capy.loadBalancer.securityGroups }}
+    securityGroups:
+    {{- range . }}
+    - {{ . | quote }}
+    {{- end }}
+    {{- end }}
+    healthcheck:
+      healthcheckIntervalSec: {{ dig "loadBalancer" "healthcheck" "healthcheckIntervalSec" 3 .Values.capy }}
+      healthcheckTimeoutSec: {{ dig "loadBalancer" "healthcheck" "healthcheckTimeoutSec" 1 .Values.capy }}
+      healthcheckThreshold: {{ dig "loadBalancer" "healthcheck" "healthcheckThreshold" 3 .Values.capy }}
+    listener:
+      {{- /* Do not use `| default true` — false would be replaced by true */ -}}
+      {{- $listener := .Values.capy.loadBalancer.listener | default dict }}
+      internal: {{ hasKey $listener "internal" | ternary $listener.internal false }}
+      port: {{ $listener.port | default 6443 }}
+      {{- if $listener.address }}
+      address: {{ $listener.address | quote }}
+      {{- end }}
+      subnet:
+        id: {{ required "capy.subnetID is required" .Values.capy.subnetID | quote }}
+        zoneID: {{ required "capy.zoneID is required" .Values.capy.zoneID | quote }}
+  {{- if .Values.capy.createIdentity | default true }}
+  identityRef:
+    name: {{ include "capy-cluster.identityName" . | quote }}
+    namespace: {{ .Values.capy.identityNamespace | default "capy-system" | quote }}
+  {{- else if and .Values.capy.identityRef .Values.capy.identityRef.name }}
+  identityRef:
+    name: {{ .Values.capy.identityRef.name | quote }}
+    namespace: {{ .Values.capy.identityRef.namespace | default "capy-system" | quote }}
+  {{- end }}
+  {{- if .Values.capy.labels }}
+  labels:
+    {{- range $k, $v := .Values.capy.labels }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
+  {{- else }}
+  labels:
+    shturval: {{ .Release.Name | quote }}
+  {{- end }}

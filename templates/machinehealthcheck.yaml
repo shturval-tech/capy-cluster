@@ -1,0 +1,32 @@
+{{- range $k, $v := .Values.workerNodes }}
+{{- $mhc := $v.machineHealthCheck | default dict }}
+{{- /* MHC enabled by default (as in Shturval 2.14); set machineHealthCheck.enabled: false to disable */ -}}
+{{- if ne ($mhc.enabled | toString) "false" }}
+{{- $checks := $mhc.checks | default (dict
+  "nodeStartupTimeoutSeconds" 0
+  "unhealthyNodeConditions" (list
+    (dict "status" "Unknown" "timeoutSeconds" 600 "type" "Ready")
+    (dict "status" "False" "timeoutSeconds" 600 "type" "Ready")
+  )
+) }}
+{{- $remediation := $mhc.remediation | default (dict "triggerIf" (dict "unhealthyLessThanOrEqualTo" "40%")) }}
+apiVersion: cluster.x-k8s.io/v1beta2
+kind: MachineHealthCheck
+metadata:
+  name: {{ $.Release.Name }}-{{ $k }}-healthcheck
+  namespace: {{ $.Release.Name }}
+  labels:
+    cluster.x-k8s.io/cluster-name: {{ $.Release.Name }}
+    {{- include "capy-cluster.labels" $ | nindent 4 }}
+spec:
+  checks:
+{{- toYaml $checks | nindent 4 }}
+  clusterName: {{ $.Release.Name }}
+  remediation:
+{{- toYaml $remediation | nindent 4 }}
+  selector:
+    matchLabels:
+      cluster.x-k8s.io/deployment-name: {{ $.Release.Name }}-{{ $k }}
+---
+{{- end }}
+{{- end }}

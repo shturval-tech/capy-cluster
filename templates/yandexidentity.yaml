@@ -1,0 +1,15 @@
+{{- if .Values.capy.createIdentity | default true }}
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+kind: YandexIdentity
+metadata:
+  name: {{ include "capy-cluster.identityName" . }}
+  namespace: {{ .Values.capy.identityNamespace | default "capy-system" }}
+  labels:
+    shturval.tech/provider: ""
+    {{- include "capy-cluster.labels" . | nindent 4 }}
+  annotations:
+    {{- include "capy-cluster.providerAnnotations" . | nindent 4 }}
+spec:
+  secretname: {{ include "capy-cluster.credentialsSecretName" . | quote }}
+  keyname: {{ include "capy-cluster.credentialsKeyName" . | quote }}
+{{- end }}

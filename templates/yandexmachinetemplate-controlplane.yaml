@@ -1,0 +1,14 @@
+apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+kind: YandexMachineTemplate
+metadata:
+  name: {{ .Release.Name }}-control-plane
+  namespace: {{ .Release.Name }}
+  labels:
+    cluster-name: {{ .Release.Name }}
+    cluster.x-k8s.io/cluster-name: {{ .Release.Name }}
+    cluster.x-k8s.io/control-plane: "true"
+    {{- include "capy-cluster.labels" . | nindent 4 }}
+spec:
+  template:
+    spec:
+{{- include "capy-cluster.yandexMachineSpec" (dict "root" . "group" .Values.master) | nindent 6 }}
