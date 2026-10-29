@@ -52,6 +52,6 @@ spec:
         apiGroup: infrastructure.cluster.x-k8s.io
         kind: YandexMachineTemplate
         name: {{ $.Release.Name }}-{{ $k }}
-      version: v{{ $.Values.kubeVersion }}
+      version: v{{ include "capy-cluster.effectiveKubeVersion" $ }}
 ---
 {{- end }}

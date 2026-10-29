@@ -1,0 +1,80 @@
+{{- $mode := "auto" -}}
+{{- if .Values.infrastructureProvider -}}
+{{- $mode = .Values.infrastructureProvider.create | default "auto" | toString -}}
+{{- end -}}
+{{- $hasCRD := .Capabilities.APIVersions.Has "cluster.shturval.tech/v1beta1/InfrastructureProvider" -}}
+{{- $want := or (eq $mode "true") (and (eq $mode "auto") $hasCRD) -}}
+{{- if and $want .Values.capy.createIdentity -}}
+{{- $name := include "capy-cluster.identityName" . -}}
+{{- $ns := .Values.capy.identityNamespace | default "capy-system" -}}
+{{- $found := lookup "cluster.shturval.tech/v1beta1" "InfrastructureProvider" $ns $name -}}
+{{- $owner := "" -}}
+{{- if and $found $found.metadata $found.metadata.annotations -}}
+{{- $owner = index $found.metadata.annotations "meta.helm.sh/release-name" | default "" -}}
+{{- end -}}
+{{- if or (not (and $found $found.metadata)) (eq $owner .Release.Name) }}
+{{- $capy := .Values.capy -}}
+{{- $lb := $capy.loadBalancer | default dict -}}
+{{- $listener := $lb.listener | default dict -}}
+{{- $volumeTypes := $capy.allowedVolumeTypes | default (list) -}}
+{{- if and (eq (len $volumeTypes) 0) $capy.volumeType -}}
+{{- $volumeTypes = list $capy.volumeType -}}
+{{- end -}}
+{{- $platforms := $capy.allowedPlatformIDs | default (list) -}}
+{{- if and (eq (len $platforms) 0) $capy.platformID -}}
+{{- $platforms = list $capy.platformID -}}
+{{- end -}}
+{{- $lbInternal := true -}}
+{{- if hasKey $listener "internal" -}}
+{{- $lbInternal = $listener.internal -}}
+{{- end }}
+apiVersion: cluster.shturval.tech/v1beta1
+kind: InfrastructureProvider
+metadata:
+  name: {{ $name }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "capy-cluster.labels" . | nindent 4 }}
+spec:
+  type: capyc
+  {{- if $capy.kubeTemplates }}
+  templates:
+  {{- range $kubeVersion, $imageID := $capy.kubeTemplates }}
+  {{- if $imageID }}
+  - kubeVersion: {{ $kubeVersion | quote }}
+    template: {{ $imageID | quote }}
+    templateNetInterface: {{ $capy.templateNetInterface | default "eth0" | quote }}
+  {{- end }}
+  {{- end }}
+  {{- if and $capy.imageID (not (index ($capy.kubeTemplates | default dict) (printf "v%s" (include "capy-cluster.effectiveKubeVersion" $)))) }}
+  - kubeVersion: {{ printf "v%s" (include "capy-cluster.effectiveKubeVersion" .) | quote }}
+    template: {{ $capy.imageID | quote }}
+    templateNetInterface: {{ $capy.templateNetInterface | default "eth0" | quote }}
+  {{- end }}
+  {{- end }}
+  providerRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1
+    kind: YandexIdentity
+    name: {{ $name }}
+    namespace: {{ $ns }}
+  config:
+    folderId: {{ $capy.folderID | quote }}
+    networkId: {{ $capy.networkID | quote }}
+    subnetId: {{ $capy.subnetID | quote }}
+    zoneId: {{ $capy.zoneID | quote }}
+    {{- if $volumeTypes }}
+    volumeTypes:
+    {{- range $volumeTypes }}
+    - {{ . | quote }}
+    {{- end }}
+    {{- end }}
+    {{- if $platforms }}
+    allowedPlatformIds:
+    {{- range $platforms }}
+    - {{ . | quote }}
+    {{- end }}
+    {{- end }}
+    loadBalancerType: {{ $lb.type | default "ALB" | quote }}
+    loadBalancerInternal: {{ $lbInternal }}
+{{- end }}
+{{- end }}

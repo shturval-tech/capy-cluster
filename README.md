@@ -120,7 +120,7 @@ helm upgrade --install mycluster ./capy-cluster \
 ### ClusterConfig / CSI / CCM
 
 - `deployKeepAlived: false`
-- CSI по умолчанию: `shturval-local-csi` (отдельного Yandex CSI нет)
+- CSI по умолчанию: `shturval-local-csi`. `capy.enableCSI: true` ставит `shturval-capy-csi` и Secret `yc-csi-ssc` (`folderId` + `saKey`) в namespace кластера. `providerSecretRef` указывать не нужно
 - **CCM `providerSecretRef` не задаётся** — для CAPY backend не передаёт cloud-config secret
 
 ### Сабчарты
@@ -167,3 +167,21 @@ VM и LB удаляются контроллерами CAPI/CAPY после уд
    доступа выставьте `capy.loadBalancer.listener.internal: false`.
 3. Статусы `YandexCluster`, `YandexMachine` и события CAPY-контроллера.
 4. Образ в `kubeTemplates` должен соответствовать `kubeVersion`.
+
+## Обновление чарта с 2.14 на 2.15
+
+Чарт `2.15` ставит новый кластер Штурвала **2.15.0** (Kubernetes 1.36.5).
+Уже работающий кластер 2.14 этим чартом обновляется только как Helm-релиз:
+машины не пересоздаются и обновление платформы не стартует, если values
+по-прежнему описывают 2.14.
+
+1. Сначала обновите менеджмент-кластер до Штурвала 2.15 (CRD `InfrastructureProvider`, CAPI v1beta2). Потом обновляйте чарты клиентских кластеров.
+2. Возьмите values, которыми кластер ставился (`helm get values <release> -n <namespace> -o yaml`), а не дефолты нового чарта.
+3. Не используйте `--reuse-values` вслепую и не подставляйте голый `--reset-values`: новый чарт по умолчанию содержит `shturvalReleaseVersion: 2.15.0`, `kubeVersion: 1.36.5`, новые теги etcd, pause и kube-vip. Для обновления только чарта оставьте прежние версии.
+4. Предпочтительно `helm upgrade --reset-then-reuse-values` вместе с файлом старых values, затем `helm diff upgrade` (если плагин установлен) или `helm template` / `helm upgrade --dry-run`.
+5. `shturvalReleaseVersion` меняйте только вместе с `platformUpgrade: true`. Иначе при живом кластере чарт останавливает рендер: смена `spec.releaseVersion` запускает обновление платформы. `helm template` и Argo CD не видят объекты кластера (`lookup` пустой), поэтому проверку нужно сделать до apply.
+6. `enabledServices` и `disabledServices` у существующего ClusterConfig чарт не переписывает: webhook запрещает их менять, списки читаются из живого объекта.
+7. `InfrastructureProvider` создаётся только если CRD уже есть (`infrastructureProvider.create: auto`) и объект с тем же именем не принадлежит другому релизу. Нативные секреты и аннотации `shturval.tech/*` чарт не удаляет: они нужны менеджмент-кластеру 2.14 и миграции 2.15.
+8. Поле `services.disablesservices` — явный список. Значение `all` в ClusterConfig не работает (его понимает только REST API backend и нельзя совместить с `enabledServices`). Некритичный сервис, которого нет ни в одном списке и у которого режим по умолчанию `auto`, будет установлен.
+
+Платформенное обновление клиентского кластера 2.14 → 2.15 делайте отдельно, через shturval-update / `platformUpgrade: true`, а не как побочный эффект `helm upgrade`.

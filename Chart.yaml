@@ -2,14 +2,16 @@ apiVersion: v2
 name: capy-cluster
 description: Helm-чарт для развёртывания Cluster API-кластера на провайдере Yandex Cloud (CAPY) + Shturval ClusterConfig
 type: application
-version: 0.1.0
-appVersion: "2.14.0"
+version: 0.3.0
+appVersion: "2.15.0"
 dependencies:
   - name: capsm-cluster-vm
     alias: capy-cluster-vm
+    version: 0.1.0
     repository: capsm-cluster-vm
     condition: capy-cluster-vm.enable
   - name: capsm-cluster-grafana
     alias: capy-cluster-grafana
+    version: 0.1.0
     repository: capsm-cluster-grafana
     condition: capy-cluster-grafana.enable
