@@ -132,11 +132,18 @@ Cached in Values._encryptionKey for one helm render so Secret and NCI always mat
 {{- $secretName := printf "%s-encryption-configuration" .Release.Name -}}
 {{- $existing := lookup "v1" "Secret" .Release.Name $secretName -}}
 {{- if and $existing $existing.data $existing.data.secret -}}
-{{- /* Helm lookup returns API base64 form; decode to raw key */ -}}
+{{- /* Существующий ключ не пересчитываем. */ -}}
 {{- $key = index $existing.data "secret" | b64dec -}}
+{{- else if .Values.etcd.encryptionSeed -}}
+{{- $key = sha256sum (printf "%s:%s-encryption-key" (toString .Values.etcd.encryptionSeed) .Release.Name) | trunc 32 -}}
 {{- else -}}
-{{- /* Deterministic 32-char material unique per release (AES-CBC key length) */ -}}
+{{- $cc := lookup "cluster.shturval.tech/v1beta1" "ClusterConfig" .Release.Name .Release.Name -}}
+{{- if and $cc $cc.spec -}}
+{{- /* Апгрейд существующего кластера: ключ не меняем. */ -}}
 {{- $key = sha256sum (printf "%s-encryption-key" .Release.Name) | trunc 32 -}}
+{{- else -}}
+{{- fail (printf "новый кластер %s: задайте etcd.encryptionSeed в values (случайная строка, например `openssl rand -base64 32`). Без seed шифрование etcd не будет безопасным." .Release.Name) -}}
+{{- end -}}
 {{- end -}}
 {{- $_ := set .Values "_encryptionKey" $key -}}
 {{- end -}}
@@ -330,7 +337,7 @@ Resolve default Yandex Compute image ID from capy.kubeTemplates by kubeVersion.
 Fallback: capy.imageID.
 */}}
 {{- define "capy-cluster.defaultImageID" -}}
-{{- $kubeVersion := .Values.kubeVersion | toString | trim -}}
+{{- $kubeVersion := include "capy-cluster.effectiveKubeVersion" . | toString | trim -}}
 {{- $normalizedVersion := ternary $kubeVersion (printf "v%s" $kubeVersion) (hasPrefix "v" $kubeVersion) -}}
 {{- $templates := .Values.capy.kubeTemplates | default dict -}}
 {{- $imageID := get $templates $normalizedVersion -}}
@@ -412,10 +419,16 @@ shturval.tech/load-balancer-type: {{ $lb.type | default "ALB" | quote }}
 {{- end }}
 shturval.tech/load-balancer-internal: {{ $lbInternal | toString | quote }}
 shturval.tech/template-net-interface: {{ $capy.templateNetInterface | default "eth0" | quote }}
+{{- /* Ключи новее текущего kubeVersion — из дефолтов чарта при merge values, в аннотации не пишем. */}}
+{{- $active := include "capy-cluster.effectiveKubeVersion" . }}
+{{- $tplAnnotations := list }}
 {{- range $kubeVersion, $imageID := $capy.kubeTemplates }}
-{{- if $imageID }}
-template.shturval.tech/{{ $kubeVersion }}: {{ $imageID | quote }}
+{{- if and $imageID (semverCompare (printf "<=%s" $active) (trimPrefix "v" $kubeVersion)) }}
+{{- $tplAnnotations = append $tplAnnotations (printf "template.shturval.tech/%s: %q" $kubeVersion $imageID) }}
 {{- end }}
+{{- end }}
+{{- range $tplAnnotations }}
+{{ . }}
 {{- end }}
 {{- end }}
 
