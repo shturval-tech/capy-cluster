@@ -46,11 +46,6 @@ spec:
     templateNetInterface: {{ $capy.templateNetInterface | default "eth0" | quote }}
   {{- end }}
   {{- end }}
-  {{- if and $capy.imageID (not (index ($capy.kubeTemplates | default dict) (printf "v%s" (include "capy-cluster.effectiveKubeVersion" $)))) }}
-  - kubeVersion: {{ printf "v%s" (include "capy-cluster.effectiveKubeVersion" .) | quote }}
-    template: {{ $capy.imageID | quote }}
-    templateNetInterface: {{ $capy.templateNetInterface | default "eth0" | quote }}
-  {{- end }}
   {{- end }}
   providerRef:
     apiVersion: infrastructure.cluster.x-k8s.io/v1alpha1

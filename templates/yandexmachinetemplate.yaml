@@ -12,6 +12,6 @@ metadata:
 spec:
   template:
     spec:
-{{- include "capy-cluster.yandexMachineSpec" (dict "root" $ "group" $v) | nindent 6 }}
+{{- include "capy-cluster.yandexMachineSpec" (dict "root" $ "group" $v "name" $k) | nindent 6 }}
 ---
 {{- end }}

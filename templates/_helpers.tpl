@@ -333,30 +333,43 @@ scheduler:
 {{- end }}
 
 {{/*
-Resolve default Yandex Compute image ID from capy.kubeTemplates by kubeVersion.
-Fallback: capy.imageID.
+Fail on a value that is not a Yandex Compute image ID.
+Input: dict "value" <value> "source" <field name>.
+*/}}
+{{- define "capy-cluster.validateImageID" -}}
+{{- $value := toString .value -}}
+{{- if not (regexMatch "^fd[a-z0-9]+$" $value) -}}
+{{- fail (printf "%s: expected Yandex Compute image ID like fd8c094339ic6igfku8s, got %q (use `yc compute image list`)" .source $value) -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Resolve Yandex Compute image ID for the effective kubeVersion from capy.kubeTemplates.
 */}}
 {{- define "capy-cluster.defaultImageID" -}}
 {{- $kubeVersion := include "capy-cluster.effectiveKubeVersion" . | toString | trim -}}
 {{- $normalizedVersion := ternary $kubeVersion (printf "v%s" $kubeVersion) (hasPrefix "v" $kubeVersion) -}}
 {{- $templates := .Values.capy.kubeTemplates | default dict -}}
+{{- range $version, $templateImageID := $templates -}}
+{{- if $templateImageID -}}
+{{- $_ := include "capy-cluster.validateImageID" (dict "value" $templateImageID "source" (printf "capy.kubeTemplates[%s]" $version)) -}}
+{{- end -}}
+{{- end -}}
 {{- $imageID := get $templates $normalizedVersion -}}
 {{- if not $imageID -}}
 {{- $imageID = get $templates (trimPrefix "v" $normalizedVersion) -}}
 {{- end -}}
-{{- if not $imageID -}}
-{{- $imageID = .Values.capy.imageID -}}
-{{- end -}}
-{{- required (printf "capy.kubeTemplates[%s] or capy.imageID is required" $normalizedVersion) $imageID -}}
+{{- required (printf "capy.kubeTemplates[%s] is required" $normalizedVersion) $imageID -}}
 {{- end }}
 
 {{/*
 YandexMachineSpec YAML merged from group overrides and capy defaults.
-Input: dict "root" $ "group" <master|workerGroup>
+Input: dict "root" $ "group" <master|workerGroup> "name" <group name>
 */}}
 {{- define "capy-cluster.yandexMachineSpec" -}}
 {{- $root := .root -}}
 {{- $group := .group | default dict -}}
+{{- $groupName := .name | default "group" -}}
 {{- $capy := $root.Values.capy -}}
 {{- $zoneID := $group.zoneID | default $capy.zoneID -}}
 {{- $platformID := $group.platformID | default $capy.platformID -}}
@@ -365,7 +378,12 @@ Input: dict "root" $ "group" <master|workerGroup>
 {{- $coreFraction := $group.coreFraction | default $capy.coreFraction | default 100 -}}
 {{- $volumeSize := $group.volumeSize | default $capy.volumeSize | default "100Gi" -}}
 {{- $volumeType := $group.volumeType | default $capy.volumeType | default "network-ssd" -}}
-{{- $imageID := $group.imageID | default (include "capy-cluster.defaultImageID" $root) -}}
+{{- $imageID := $group.imageID | default "" -}}
+{{- if $imageID -}}
+{{- $_ := include "capy-cluster.validateImageID" (dict "value" $imageID "source" (printf "%s.imageID" $groupName)) -}}
+{{- else -}}
+{{- $imageID = include "capy-cluster.defaultImageID" $root -}}
+{{- end -}}
 {{- $subnetID := $group.subnetID | default $capy.subnetID -}}
 {{- $hasPublicIP := false -}}
 {{- if hasKey $group "hasPublicIP" -}}

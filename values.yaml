@@ -135,7 +135,6 @@ capy:
   cores: 4
   memory: "8Gi"
   coreFraction: 100
-  imageID: ""  # fallback if kubeTemplates miss version
   hasPublicIP: false
   templateNetInterface: eth0
   loadBalancer:
@@ -156,9 +155,8 @@ capy:
   allowedPlatformIDs: []
   allowedVolumeTypes: []
   kubeTemplates:
-    # Yandex Compute image ID для соответствующей версии Kubernetes.
-    # Обязательно заполнить: чарт остановит рендер, если для текущей kubeVersion нет image ID
-    # (и не задан capy.imageID). Значение ниже — пример, замените на свой образ.
+    # Yandex Compute image ID (fd...), не имя образа: yc compute image list
+    # Обязательно заполнить для используемой версии Kubernetes.
     v1.36.5: "fd8p4v1q2m3n4o5p6q7r"  # ПРИМЕР, замените на реальный image ID
   labels: {}
   # identityRef used when createIdentity: false

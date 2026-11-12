@@ -11,4 +11,4 @@ metadata:
 spec:
   template:
     spec:
-{{- include "capy-cluster.yandexMachineSpec" (dict "root" . "group" .Values.master) | nindent 6 }}
+{{- include "capy-cluster.yandexMachineSpec" (dict "root" . "group" .Values.master "name" "master") | nindent 6 }}

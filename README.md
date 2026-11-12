@@ -32,8 +32,8 @@ Helm-чарт для развёртывания клиентского (или p
 
 2. В Yandex Cloud:
    - folder, VPC network и subnet (зона совпадает с `capy.zoneID`);
-   - образ Compute Image под целевую версию Kubernetes
-     (`capy.kubeTemplates` / `capy.imageID`);
+   - образ Compute Image (image **ID**, не имя) под целевую версию Kubernetes
+     (`capy.kubeTemplates`);
    - Service Account с ролями не ниже **compute.editor** и **alb.editor**,
      authorized key (JSON).
 
@@ -82,12 +82,11 @@ helm upgrade --install mycluster ./capy-cluster \
 | `folderID`, `networkID`, `subnetID`, `zoneID` | Обязательные параметры размещения |
 | `platformID` | Платформа VM (`standard-v3` и т.д.) |
 | `volumeSize`, `volumeType` | Boot disk (quantity вроде `100Gi`, тип `network-ssd`) |
-| `imageID` | Fallback image ID, если нет записи в `kubeTemplates` |
 | `hasPublicIP` | Публичный IP на сетевом интерфейсе VM |
 | `templateNetInterface` | Интерфейс в образе (для backend UI), обычно `eth0` |
 | `loadBalancer.*` | ALB: type, name, backendPort, listener (internal/port/address), securityGroups, healthcheck |
 | `allowedPlatformIDs` / `allowedVolumeTypes` | Списки для аннотаций backend |
-| `kubeTemplates` | Карта `v<kubeVersion>` → Compute image ID. **Обязательно** заполнить для используемой версии Kubernetes |
+| `kubeTemplates` | Карта `v<kubeVersion>` → **Yandex Compute image ID** (`fd...`), не имя образа. **Обязательно** заполнить для используемой версии Kubernetes |
 | `labels` | Метки YC-ресурсов в `YandexCluster.spec.labels` |
 | `identityRef` | Внешний identity при `createIdentity: false` |
 
@@ -149,7 +148,7 @@ capy:
 
 `helm upgrade` обновляет CAPI-ресурсы. Смена `YandexMachineTemplate` обычно
 требует rolling update MachineDeployment / KCP. При autoscaling CAPY создаёт
-новые VM из образа — нужны квота и корректный `kubeTemplates` / `imageID`.
+новые VM из образа — нужны квота и корректный `kubeTemplates`.
 
 ## Удаление
 
@@ -167,6 +166,7 @@ VM и LB удаляются контроллерами CAPI/CAPY после уд
    доступа выставьте `capy.loadBalancer.listener.internal: false`.
 3. Статусы `YandexCluster`, `YandexMachine` и события CAPY-контроллера.
 4. Образ в `kubeTemplates` должен соответствовать `kubeVersion`.
+   Указывайте image ID (`fd...`), а не имя образа (`yc compute image list`).
 
 ## Обновление чарта с 2.14 на 2.15
 
